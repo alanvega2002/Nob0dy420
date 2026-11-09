@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. // OS HOME HUD</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Orbitron (Sci-Fi HUD) & Rajdhani (Tech Readability) & Share Tech Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --hud-primary: #00f3ff;
+            --hud-secondary: #0077ff;
+            --hud-accent: #ff9900;
+            --hud-bg-glass: rgba(4, 14, 28, 0.76);
+            --hud-border: rgba(0, 243, 255, 0.45);
+            --hud-glow: 0 0 15px rgba(0, 243, 255, 0.35);
+            --bg-overlay-opacity: 0.72;
+        }
+
+        /* Tema Mark LXXXV (Iron Man Rojo / Dorado) */
+        body.theme-ironman {
+            --hud-primary: #ffcc00;
+            --hud-secondary: #ff2a2a;
+            --hud-accent: #00f3ff;
+            --hud-bg-glass: rgba(24, 6, 8, 0.78);
+            --hud-border: rgba(255, 204, 0, 0.48);
+            --hud-glow: 0 0 15px rgba(255, 60, 0, 0.4);
+        }
+
+        /* Tema Cyber Gamer (Neón Púrpura / Verde) */
+        body.theme-gamer {
+            --hud-primary: #d946ef;
+            --hud-secondary: #6366f1;
+            --hud-accent: #10b981;
+            --hud-bg-glass: rgba(13, 8, 28, 0.78);
+            --hud-border: rgba(217, 70, 239, 0.45);
+            --hud-glow: 0 0 15px rgba(217, 70, 239, 0.38);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #020813;
+            color: #e2f8ff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .font-mono-tech {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Capas de Fondo Dinámico (Slideshow) */
+        #bg-stage {
+            position: fixed;
+            inset: 0;
+            z-index: -3;
+            overflow: hidden;
+            background: #02060d;
+        }
+
+        .bg-slide {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transform: scale(1.04);
+            transition: opacity 1.4s ease-in-out, transform 8s ease-out;
+        }
+
+        .bg-slide.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Capa de malla holográfica sobre las fotos de fondo */
+        #bg-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background: 
+                radial-gradient(circle at 50% 35%, rgba(0, 20, 40, 0.35) 0%, rgba(2, 8, 18, var(--bg-overlay-opacity)) 80%),
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 35px 35px, 35px 35px;
+            pointer-events: none;
+            transition: background 0.3s ease;
+        }
+
+        /* Efecto Scanline sutil */
+        #scanline {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.22) 51%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        /* Paneles Holográficos J.A.R.V.I.S. */
+        .hud-panel {
+            background: var(--hud-bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--hud-border);
+            box-shadow: var(--hud-glow), inset 0 0 20px rgba(0, 243, 255, 0.05);
+            position: relative;
+            border-radius: 0.75rem;
+            transition: all 0.25s ease;
+        }
+
+        /* Esquinas técnicas brillantes en cada panel */
+        .hud-panel::before,
+        .hud-panel::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-color: var(--hud-primary);
+            pointer-events: none;
+        }
+
+        .hud-panel::before {
+            top: -1px;
+            left: -1px;
+            border-top: 2px solid var(--hud-primary);
+            border-left: 2px solid var(--hud-primary);
+            border-top-left-radius: 0.5rem;
+        }
+
+        .hud-panel::after {
+            bottom: -1px;
+            right: -1px;
+            border-bottom: 2px solid var(--hud-primary);
+            border-right: 2px solid var(--hud-primary);
+            border-bottom-right-radius: 0.5rem;
+        }
+
+        /* Tarjetas de Acceso Rápido */
+        .hud-card {
+            background: rgba(8, 22, 42, 0.65);
+            border: 1px solid rgba(0, 243, 255, 0.22);
+            border-radius: 0.65rem;
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hud-card:hover {
+            transform: translateY(-3px) scale(1.02);
+            border-color: var(--hud-primary);
+            box-shadow: 0 0 18px rgba(0, 243, 255, 0.35);
+            background: rgba(12, 34, 64, 0.85);
+        }
+
+        .hud-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.5s ease;
+        }
+
+        .hud-card:hover::after {
+            left: 140%;
+        }
+
+        /* Animaciones del Reactor Arc Central */
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes spinReverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 8px var(--hud-primary)); opacity: 0.9; }
+            50% { filter: drop-shadow(0 0 18px var(--hud-primary)); opacity: 1; }
+        }
+
+        .arc-ring-1 { animation: spinSlow 24s linear infinite; }
+        .arc-ring-2 { animation: spinReverse 16s linear infinite; }
+        .arc-ring-3 { animation: spinSlow 10s linear infinite; }
+        .arc-core-pulse { animation: pulseGlow 3s ease-in-out infinite; }
+
+        /* Botones estilo HUD */
+        .hud-btn {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--hud-border);
+            color: var(--hud-primary);
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .hud-btn:hover {
+            background: var(--hud-primary);
+            color: #020813;
+            box-shadow: 0 0 14px var(--hud-primary);
+        }
+
+        .hud-btn-active {
+            background: var(--hud-primary);
+            color: #020813;
+            box-shadow: 0 0 12px var(--hud-primary);
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030b17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--hud-primary);
+            border-radius: 3px;
+        }
+
+        /* Canvas del Minijuego */
+        #arcadeCanvas {
+            background: radial-gradient(circle at center, rgba(4, 22, 42, 0.92), rgba(1, 8, 18, 0.98));
+            border: 1px solid var(--hud-border);
+            border-radius: 0.5rem;
+            display: block;
+            width: 100%;
+            height: 230px;
+            box-shadow: inset 0 0 25px rgba(0, 243, 255, 0.15);
+        }
+
+        .text-hud {
+            color: var(--hud-primary);
+        }
+        .border-hud {
+            border-color: var(--hud-border);
+        }
+    </style>
+</head>
+<body class="p-3 sm:p-5 lg:p-6 flex flex-col justify-between min-h-screen">
+
+    <!-- =========================================================================
+         1. FONDO DINÁMICO CARRUSEL (SLIDESHOW)
+         ========================================================================= -->
+    <div id="bg-stage"></div>
+    <div id="bg-overlay"></div>
+    <div id="scanline"></div>
+
+    <!-- =========================================================================
+         2. BARRA SUPERIOR (TELEMETRÍA J.A.R.V.I.S. Y CONTROLES DE PERSONALIZACIÓN)
+         ========================================================================= -->
+    <header class="hud-panel px-4 py-2.5 mb-4 flex flex-wrap items-center justify-between gap-3 z-10">
+        <!-- Identificador del Sistema -->
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-orbitron font-bold text-sm sm:text-base tracking-wider text-hud">J.A.R.V.I.S. // OS MARK X</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-400/40 font-mono-tech text-cyan-300">ONLINE</span>
+                </div>
+                <p class="text-xs text-slate-300 font-mono-tech hidden sm:block">SISTEMA DE INICIO PERSONALIZADO // PROTOCOLO BRAVE</p>
+            </div>
+        </div>
+
+        <!-- Telemetría Decorativa en Tiempo Real -->
+        <div class="hidden xl:flex items-center gap-6 font-mono-tech text-xs">
+            <div>
+                <div class="flex justify-between text-slate-300 mb-0.5"><span>CPU CORE</span><span id="cpuVal" class="text-hud">18%</span></div>
+                <div class="w-24 h-1.5 bg-slate-800 rounded overflow-hidden">
+                    <div id="cpuBar" class="h-full bg-cyan-400 transition-all duration-700" style="width: 18%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between text-slate-300 mb-0.5"><span>MEMORIA RAM</span><span id="ramVal" class="text-hud">42%</span></div>
+                <div class="w-24 h-1.5 bg-slate-800 rounded overflow-hidden">
+                    <div id="ramBar" class="h-full bg-cyan-400 transition-all duration-700" style="width: 42%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between text-slate-300 mb-0.5"><span>FONDO ACTUAL</span><span id="slideCounter" class="text-hud">1/4</span></div>
+                <div class="flex items-center gap-1">
+                    <button onclick="prevBackground()" title="Fondo anterior" class="px-1.5 py-0.5 bg-slate-800/90 hover:bg-cyan-500/30 rounded text-[10px] border border-cyan-500/30"><i class="fa-solid fa-backward-step"></i></button>
+                    <button onclick="toggleSlideshowPause()" id="pauseSlideBtn" title="Pausar/Reanudar carrusel" class="px-1.5 py-0.5 bg-slate-800/90 hover:bg-cyan-500/30 rounded text-[10px] border border-cyan-500/30"><i class="fa-solid fa-pause"></i></button>
+                    <button onclick="nextBackground()" title="Siguiente fondo" class="px-1.5 py-0.5 bg-slate-800/90 hover:bg-cyan-500/30 rounded text-[10px] border border-cyan-500/30"><i class="fa-solid fa-forward-step"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de Configuración del Usuario -->
+        <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openModal('bgModal')" class="hud-btn px-3 py-1.5 text-xs sm:text-sm flex items-center gap-1.5" title="Subir o cambiar tus fotos de fondo">
+                <i class="fa-solid fa-images"></i>
+                <span>Mis Fondos</span>
+            </button>
+            <button onclick="openLinkModal()" class="hud-btn px-3 py-1.5 text-xs sm:text-sm flex items-center gap-1.5" title="Agregar nuevo juego o página web">
+                <i class="fa-solid fa-plus-circle"></i>
+                <span>+ Juego / Link</span>
+            </button>
+            <button onclick="cycleTheme()" class="hud-btn px-2.5 py-1.5 text-xs sm:text-sm flex items-center gap-1.5" title="Cambiar color del HUD (Jarvis / Iron Man / Gamer)">
+                <i class="fa-solid fa-palette"></i>
+                <span class="hidden md:inline" id="themeLabel">Cian Jarvis</span>
+            </button>
+            <button onclick="toggleSound()" id="soundBtn" class="hud-btn px-2.5 py-1.5 text-xs sm:text-sm" title="Efectos de sonido HUD">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+            <button onclick="openModal('githubModal')" class="hud-btn px-2.5 py-1.5 text-xs sm:text-sm flex items-center gap-1" title="Cómo subir a GitHub con tus fotos">
+                <i class="fa-brands fa-github"></i>
+                <span class="hidden sm:inline">GitHub</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- =========================================================================
+         3. GRID PRINCIPAL DE LA INTERFAZ (3 COLUMNAS ADAPTABLES)
+         ========================================================================= -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-grow items-start z-10">
+
+        <!-- COLUMNA IZQUIERDA: REDES SOCIALES, COMPRAS E INTELIGENCIA ARTIFICIAL -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+            
+            <!-- MÓDULO: REDES & COMUNICACIÓN -->
+            <div class="hud-panel p-4">
+                <div class="flex items-center justify-between border-b border-hud pb-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-satellite-dish text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Redes & Social</h2>
+                    </div>
+                    <span class="font-mono-tech text-[11px] text-slate-400">MOD // 01</span>
+                </div>
+                <div id="grid-social" class="grid grid-cols-3 gap-2.5">
+                    <!-- Se renderiza dinámicamente con JS -->
+                </div>
+            </div>
+
+            <!-- MÓDULO: COMPRAS & MARKETPLACE -->
+            <div class="hud-panel p-4">
+                <div class="flex items-center justify-between border-b border-hud pb-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-cart-shopping text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Compras & Market</h2>
+                    </div>
+                    <span class="font-mono-tech text-[11px] text-slate-400">MOD // 02</span>
+                </div>
+                <div id="grid-shopping" class="grid grid-cols-3 gap-2.5">
+                    <!-- Se renderiza dinámicamente con JS -->
+                </div>
+            </div>
+
+            <!-- MÓDULO: INTELIGENCIA ARTIFICIAL -->
+            <div class="hud-panel p-4">
+                <div class="flex items-center justify-between border-b border-hud pb-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Núcleos de IA</h2>
+                    </div>
+                    <span class="font-mono-tech text-[11px] text-slate-400">MOD // 03</span>
+                </div>
+                <div id="grid-ai" class="grid grid-cols-2 gap-3">
+                    <!-- Se renderiza dinámicamente con JS -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- COLUMNA CENTRAL: REACTOR ARC, RELOJ, BUSCADOR Y ZONA GAMER -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+
+            <!-- NÚCLEO CENTRAL J.A.R.V.I.S. (REACTOR + RELOJ + BUSCADOR) -->
+            <div class="hud-panel p-5 flex flex-col items-center text-center">
+                
+                <!-- Reactor Arc Animado con Reloj Digital adentro -->
+                <div class="relative w-44 h-44 sm:w-48 sm:h-48 flex items-center justify-center mb-3">
+                    <!-- Anillo Exterior SVG -->
+                    <svg class="absolute inset-0 w-full h-full arc-ring-1" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="2" class="text-hud opacity-40" stroke-dasharray="18 8 4 8" />
+                        <circle cx="100" cy="100" r="85" fill="none" stroke="currentColor" stroke-width="4" class="text-hud opacity-70" stroke-dasharray="45 90" />
+                    </svg>
+                    <!-- Anillo Medio SVG -->
+                    <svg class="absolute inset-2 w-[calc(100%-16px)] h-[calc(100%-16px)] arc-ring-2" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="76" fill="none" stroke="currentColor" stroke-width="3" class="text-hud opacity-60" stroke-dasharray="12 12" />
+                        <circle cx="100" cy="100" r="68" fill="none" stroke="currentColor" stroke-width="6" class="text-hud opacity-30" stroke-dasharray="30 60" />
+                    </svg>
+                    <!-- Anillo Interno SVG -->
+                    <svg class="absolute inset-4 w-[calc(100%-32px)] h-[calc(100%-32px)] arc-ring-3 arc-core-pulse" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="56" fill="none" stroke="currentColor" stroke-width="2.5" class="text-hud" stroke-dasharray="60 25" />
+                    </svg>
+
+                    <!-- Reloj Digital en el Centro -->
+                    <div class="z-10 flex flex-col items-center justify-center bg-slate-950/80 rounded-full w-32 h-32 border border-hud shadow-inner p-2">
+                        <span id="hudGreeting" class="text-[10px] font-mono-tech uppercase tracking-widest text-cyan-300">BIENVENIDO, SEÑOR</span>
+                        <div id="clockTime" class="font-orbitron font-black text-2xl sm:text-3xl tracking-wider text-white my-0.5">00:00</div>
+                        <div id="clockSeconds" class="font-mono-tech text-xs text-hud">00 SEG</div>
+                    </div>
+                </div>
+
+                <!-- Fecha Actual -->
+                <div id="clockDate" class="font-orbitron text-xs sm:text-sm uppercase tracking-widest text-hud mb-4">
+                    CARGANDO CRONÓMETRO...
+                </div>
+
+                <!-- Barra de Búsqueda Multi-Motor (Brave / Google / YouTube) -->
+                <form id="searchForm" onsubmit="handleSearch(event)" class="w-full">
+                    <div class="flex items-center gap-1.5 mb-2 justify-center">
+                        <button type="button" onclick="setSearchEngine('brave')" id="eng-brave" class="engine-btn hud-btn hud-btn-active px-2.5 py-0.5 text-xs flex items-center gap-1">
+                            <i class="fa-solid fa-shield-halved"></i> Brave
+                        </button>
+                        <button type="button" onclick="setSearchEngine('google')" id="eng-google" class="engine-btn hud-btn px-2.5 py-0.5 text-xs flex items-center gap-1">
+                            <i class="fa-brands fa-google"></i> Google
+                        </button>
+                        <button type="button" onclick="setSearchEngine('youtube')" id="eng-youtube" class="engine-btn hud-btn px-2.5 py-0.5 text-xs flex items-center gap-1">
+                            <i class="fa-brands fa-youtube"></i> YouTube
+                        </button>
+                    </div>
+                    <div class="relative flex items-center">
+                        <i class="fa-solid fa-terminal absolute left-3.5 text-hud text-sm"></i>
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Ejecutar búsqueda en la red..." 
+                            autocomplete="off"
+                            class="w-full pl-9 pr-12 py-2.5 bg-slate-950/85 border border-hud rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 font-mono-tech"
+                        >
+                        <button type="submit" class="absolute right-1.5 px-3 py-1.5 hud-btn text-xs">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- MÓDULO: ZONA GAMER & EMULADORES (EDITABLE Y EXPANDIBLE) -->
+            <div class="hud-panel p-4 flex-grow">
+                <div class="flex items-center justify-between border-b border-hud pb-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-gamepad text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Zona Gamer // Links</h2>
+                    </div>
+                    <button onclick="openLinkModal('games')" class="hud-btn px-2.5 py-1 text-xs flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Agregar Juego
+                    </button>
+                </div>
+                <p class="text-xs text-slate-300 mb-3">
+                    Haz clic en el ícono <i class="fa-solid fa-pen text-cyan-300"></i> de cualquier tarjeta para poner o cambiar el enlace de tus juegos (como <b>DBZ Budokai Tenkaichi 3</b>, <b>CoD Zombies</b> o más).
+                </p>
+                <div id="grid-games" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1">
+                    <!-- Se renderiza dinámicamente con JS -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- COLUMNA DERECHA: CONSOLA ARCADE INTEGRADA (SNAKE + CHROME DINO RUNNER) -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+            
+            <!-- MÓDULO ARCADE HUD -->
+            <div class="hud-panel p-4 flex flex-col">
+                <div class="flex flex-wrap items-center justify-between border-b border-hud pb-2 mb-3 gap-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-joystick text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Módulo Arcade HUD</h2>
+                    </div>
+                    <!-- Selector de Minijuego -->
+                    <div class="flex items-center gap-1">
+                        <button onclick="switchArcadeGame('snake')" id="tab-snake" class="hud-btn hud-btn-active px-2.5 py-1 text-xs font-mono-tech">
+                            🐍 CYBER-SNAKE
+                        </button>
+                        <button onclick="switchArcadeGame('dino')" id="tab-dino" class="hud-btn px-2.5 py-1 text-xs font-mono-tech">
+                            🦖 DINO-RUNNER
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Marcador de Puntuación -->
+                <div class="flex items-center justify-between bg-slate-950/80 border border-hud/50 rounded-lg px-3 py-2 mb-3 font-mono-tech text-xs">
+                    <div>
+                        <span class="text-slate-400">JUEGO ACTIVO:</span>
+                        <span id="arcadeGameTitle" class="text-hud font-bold ml-1">CYBER-SNAKE</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <div>PUNTOS: <span id="arcadeScore" class="text-white font-bold">0</span></div>
+                        <div>RÉCORD: <span id="arcadeHighScore" class="text-amber-400 font-bold">0</span></div>
+                    </div>
+                </div>
+
+                <!-- Lienzo (Canvas) del Minijuego -->
+                <div class="relative w-full">
+                    <canvas id="arcadeCanvas" width="420" height="230"></canvas>
+                    
+                    <!-- Capa de Inicio / Game Over sobre el Canvas -->
+                    <div id="arcadeOverlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-xs rounded-lg flex flex-col items-center justify-center p-4 text-center">
+                        <i id="overlayIcon" class="fa-solid fa-staff-snake text-3xl text-hud mb-2"></i>
+                        <h3 id="overlayTitle" class="font-orbitron font-bold text-base text-white mb-1">CYBER-SNAKE J.A.R.V.I.S.</h3>
+                        <p id="overlayDesc" class="text-xs text-slate-300 max-w-xs mb-3">
+                            Usa las flechas del teclado o <kbd class="px-1.5 py-0.5 bg-slate-800 border border-cyan-500/40 rounded text-cyan-300">W A S D</kbd> para recolectar núcleos de energía.
+                        </p>
+                        <button onclick="startArcadeGame()" class="hud-btn px-5 py-2 text-xs sm:text-sm font-orbitron uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-play"></i> INICIAR PARTIDA
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Controles Táctiles / Mouse para jugar también con clic -->
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <div class="text-[11px] font-mono-tech text-slate-300">
+                        <span id="controlsHint"><i class="fa-solid fa-keyboard text-hud mr-1"></i>Controles: Flechas / WASD (Espacio: Saltar en Dino)</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mx-auto sm:mx-0">
+                        <button onclick="arcadeControlInput('LEFT')" class="hud-btn w-8 h-8 flex items-center justify-center text-xs" title="Izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button onclick="arcadeControlInput('UP')" class="hud-btn w-8 h-8 flex items-center justify-center text-xs" title="Arriba / Saltar"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button onclick="arcadeControlInput('DOWN')" class="hud-btn w-8 h-8 flex items-center justify-center text-xs" title="Abajo / Agacharse"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button onclick="arcadeControlInput('RIGHT')" class="hud-btn w-8 h-8 flex items-center justify-center text-xs" title="Derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MÓDULO: NOTAS RÁPIDAS / BITÁCORA GAMER -->
+            <div class="hud-panel p-4">
+                <div class="flex items-center justify-between border-b border-hud pb-2 mb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-list text-hud"></i>
+                        <h2 class="font-orbitron font-bold text-sm tracking-wider uppercase">Bitácora // Notas Rápidas</h2>
+                    </div>
+                    <span id="noteSavedBadge" class="font-mono-tech text-[11px] text-emerald-400 opacity-0 transition-opacity">GUARDADO</span>
+                </div>
+                <textarea 
+                    id="quickNotes" 
+                    rows="3" 
+                    placeholder="Escribe aquí tus códigos, trucos de Budokai Tenkaichi 3, pasos del Easter Egg de CoD Zombies o pendientes..."
+                    class="w-full bg-slate-950/75 border border-hud/40 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono-tech resize-none"
+                ></textarea>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- =========================================================================
+         4. PIE DE PÁGINA (ESTADO DEL CARRUSEL Y ACCESOS RÁPIDOS DE SISTEMA)
+         ========================================================================= -->
+    <footer class="mt-4 hud-panel px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-mono-tech text-slate-300 z-10">
+        <div class="flex items-center gap-2">
+            <span class="text-hud"><i class="fa-solid fa-circle-nodes mr-1"></i>ESTADO:</span>
+            <span id="statusTicker">Todos los módulos operativos. Fondos dinámicos sincronizados.</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="openModal('bgModal')" class="hover:text-cyan-300 underline decoration-cyan-500/50">
+                Cambiar fotos de fondo (<span id="totalBgCount">4</span> activas)
+            </button>
+            <button onclick="exportConfigForGitHub()" class="hover:text-cyan-300 underline decoration-cyan-500/50">
+                <i class="fa-solid fa-code mr-1"></i>Exportar mis cambios para GitHub
+            </button>
+        </div>
+    </footer>
+
+    <!-- =========================================================================
+         5. MODAL: GESTOR DE FONDOS DE PANTALLA (SUBIR DESDE PC O RUTAS DE GITHUB)
+         ========================================================================= -->
+    <div id="bgModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="hud-panel max-w-2xl w-full p-5 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-hud pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-images text-hud text-lg"></i>
+                    <h3 class="font-orbitron font-bold text-base sm:text-lg text-white">GESTOR DE FONDOS DINÁMICOS</h3>
+                </div>
+                <button onclick="closeModal('bgModal')" class="hud-btn w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto pr-1 space-y-4 text-xs sm:text-sm">
+                <!-- Opción 1: Subir fotos directamente desde la PC -->
+                <div class="bg-slate-900/90 border border-hud/50 rounded-lg p-3.5">
+                    <h4 class="font-orbitron font-bold text-hud mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-upload"></i> 1. Subir fotos desde tu PC (Guardado instantáneo en Brave)
+                    </h4>
+                    <p class="text-xs text-slate-300 mb-2.5">
+                        Selecciona una o varias fotos que te gusten de tu computadora. Se comprimirán de forma inteligente y quedarán guardadas en tu navegador.
+                    </p>
+                    <label class="hud-btn px-4 py-2 inline-flex items-center gap-2 cursor-pointer text-xs">
+                        <i class="fa-solid fa-folder-open"></i> Seleccionar Imágenes de mi PC
+                        <input type="file" id="bgFileInput" accept="image/*" multiple onchange="handleLocalImageUpload(event)" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Opción 2: Agregar por ruta de carpeta GitHub o URL de internet -->
+                <div class="bg-slate-900/90 border border-hud/50 rounded-lg p-3.5">
+                    <h4 class="font-orbitron font-bold text-hud mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-link"></i> 2. Agregar por nombre de archivo (GitHub) o Link URL
+                    </h4>
+                    <p class="text-xs text-slate-300 mb-2">
+                        Si subes tus fotos a la misma carpeta de tu repositorio en GitHub (por ejemplo: <code class="text-cyan-300">fondo1.jpg</code> o <code class="text-cyan-300">img/goku.png</code>) o tienes un link directo de una imagen, escríbelo aquí:
+                    </p>
+                    <div class="flex gap-2">
+                        <input 
+                            type="text" 
+                            id="bgUrlInput" 
+                            placeholder="Ej: img/mi-fondo.jpg o https://..." 
+                            class="flex-grow bg-slate-950 border border-hud/60 rounded px-3 py-1.5 text-xs text-white font-mono-tech focus:outline-none"
+                        >
+                        <button onclick="addBackgroundByUrl()" class="hud-btn px-4 py-1.5 text-xs whitespace-nowrap">
+                            + Agregar Fondo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ajustes de Tiempo de Cambio y Oscuridad -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/90 border border-hud/50 rounded-lg p-3.5">
+                    <div>
+                        <label class="block text-xs font-mono-tech text-slate-300 mb-1">Cambiar fondo automáticamente cada:</label>
+                        <select id="bgIntervalSelect" onchange="updateBgSettings()" class="w-full bg-slate-950 border border-hud/60 rounded px-2.5 py-1.5 text-xs text-white font-mono-tech">
+                            <option value="8000">8 Segundos (Rápido)</option>
+                            <option value="15000">15 Segundos (Recomendado)</option>
+                            <option value="30000">30 Segundos</option>
+                            <option value="60000">1 Minuto</option>
+                            <option value="300000">5 Minutos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono-tech text-slate-300 mb-1">Brillo / Visibilidad de la foto de fondo:</label>
+                        <input 
+                            type="range" 
+                            id="bgOpacityRange" 
+                            min="0.25" 
+                            max="0.88" 
+                            step="0.05" 
+                            value="0.68" 
+                            oninput="updateBgOverlayOpacity(this.value)"
+                            class="w-full accent-cyan-400 cursor-pointer mt-1.5"
+                        >
+                    </div>
+                </div>
+
+                <!-- Lista de Imágenes Activas -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-orbitron font-bold text-xs uppercase text-hud">Imágenes en tu Carrusel (<span id="modalBgCount">0</span>)</h4>
+                        <button onclick="resetDefaultBackgrounds()" class="text-xs text-amber-400 hover:underline">Restaurar fondos predeterminados</button>
+                    </div>
+                    <div id="bgGalleryList" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        <!-- Miniaturas generadas con JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         6. MODAL: AGREGAR O EDITAR ENLACE / JUEGO (DBZ, COD ZOMBIES, ETC.)
+         ========================================================================= -->
+    <div id="linkModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="hud-panel max-w-md w-full p-5">
+            <div class="flex items-center justify-between border-b border-hud pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-gamepad text-hud text-lg"></i>
+                    <h3 id="linkModalTitle" class="font-orbitron font-bold text-base text-white">AGREGAR / EDITAR ACCESO</h3>
+                </div>
+                <button onclick="closeModal('linkModal')" class="hud-btn w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveCustomLink(event)" class="space-y-3 text-xs sm:text-sm">
+                <input type="hidden" id="editLinkId">
+                
+                <div>
+                    <label class="block font-mono-tech text-slate-300 mb-1">Nombre del Juego o Página:</label>
+                    <input type="text" id="linkName" required placeholder="Ej: DBZ Budokai Tenkaichi 3" class="w-full bg-slate-950 border border-hud/60 rounded px-3 py-2 text-white focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block font-mono-tech text-slate-300 mb-1">URL / Dirección Web:</label>
+                    <input type="text" id="linkUrl" required placeholder="https://..." class="w-full bg-slate-950 border border-hud/60 rounded px-3 py-2 text-white font-mono-tech focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono-tech text-slate-300 mb-1">Categoría HUD:</label>
+                        <select id="linkCategory" class="w-full bg-slate-950 border border-hud/60 rounded px-2.5 py-2 text-white">
+                            <option value="games">🎮 Zona Gamer</option>
+                            <option value="social">💬 Redes & Social</option>
+                            <option value="shopping">🛒 Compras & Market</option>
+                            <option value="ai">🤖 Inteligencia Artificial</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-mono-tech text-slate-300 mb-1">Ícono (FontAwesome):</label>
+                        <select id="linkIcon" class="w-full bg-slate-950 border border-hud/60 rounded px-2.5 py-2 text-white">
+                            <option value="fa-solid fa-dragon">🐉 Dragón (DBZ)</option>
+                            <option value="fa-solid fa-skull-crossbones">💀 Calavera (CoD Zombies)</option>
+                            <option value="fa-solid fa-gamepad">🎮 Control Gamer</option>
+                            <option value="fa-solid fa-ghost">👻 Arcade / Retro</option>
+                            <option value="fa-solid fa-fire">🔥 Fuego / Acción</option>
+                            <option value="fa-solid fa-crosshairs">🎯 Shooter / FPS</option>
+                            <option value="fa-solid fa-trophy">🏆 Torneo / Ranking</option>
+                            <option value="fa-solid fa-globe">🌐 Página Web</option>
+                            <option value="fa-brands fa-twitch">🟣 Twitch / Stream</option>
+                            <option value="fa-brands fa-discord">🎧 Discord</option>
+                            <option value="fa-brands fa-steam">🕹️ Steam</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-mono-tech text-slate-300 mb-1">Subtítulo / Etiqueta corta (opcional):</label>
+                    <input type="text" id="linkSubtitle" placeholder="Ej: Emulador / Wiki / Partida Online" class="w-full bg-slate-950 border border-hud/60 rounded px-3 py-1.5 text-white focus:outline-none">
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-hud/40">
+                    <button type="button" id="deleteLinkBtn" onclick="deleteCurrentLink()" class="px-3 py-2 rounded bg-red-500/20 border border-red-500/50 text-red-300 hover:bg-red-500 hover:text-white text-xs hidden">
+                        <i class="fa-solid fa-trash mr-1"></i> Eliminar
+                    </button>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="button" onclick="closeModal('linkModal')" class="px-4 py-2 rounded bg-slate-800 text-slate-300 text-xs">Cancelar</button>
+                        <button type="submit" class="hud-btn px-5 py-2 text-xs font-orbitron">Guardar en HUD</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         7. MODAL: GUÍA GITHUB PAGES Y EXPORTACIÓN DE CONFIGURACIÓN
+         ========================================================================= -->
+    <div id="githubModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="hud-panel max-w-xl w-full p-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-hud pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-github text-hud text-xl"></i>
+                    <h3 class="font-orbitron font-bold text-base text-white">CÓMO SUBIR A GITHUB PAGES Y BRAVE</h3>
+                </div>
+                <button onclick="closeModal('githubModal')" class="hud-btn w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed">
+                <div class="p-3 rounded bg-slate-900/90 border border-hud/40">
+                    <h4 class="font-orbitron font-bold text-hud mb-1">PASO 1: Subir este archivo a tu repositorio</h4>
+                    <p>Guarda este código con el nombre exacto <code class="text-cyan-300">index.html</code> y súbelo a un repositorio público en tu cuenta de GitHub. Luego ve a <b>Settings &rarr; Pages</b> y activa la rama <b>main</b>.</p>
+                </div>
+
+                <div class="p-3 rounded bg-slate-900/90 border border-hud/40">
+                    <h4 class="font-orbitron font-bold text-hud mb-1">PASO 2: ¿Cómo agregar tus imágenes de fondo?</h4>
+                    <p class="mb-1">Tienes <b>dos formas súper cómodas</b> de hacerlo:</p>
+                    <ul class="list-disc list-inside space-y-1 text-xs text-slate-300">
+                        <li><b>Desde el botón "Mis Fondos" (Sin tocar código):</b> Puedes elegir las fotos directo desde tu PC y se quedan guardadas en la memoria de tu navegador Brave.</li>
+                        <li><b>Subiendo una carpeta <code class="text-cyan-300">img/</code> a GitHub:</b> Sube tus fotos a tu repositorio (por ejemplo <code class="text-cyan-300">img/fondo1.jpg</code>) y agrégalas en el botón "Mis Fondos" o en la lista <code class="text-cyan-300">DEFAULT_BACKGROUNDS</code> dentro del código.</li>
+                    </ul>
+                </div>
+
+                <div class="p-3 rounded bg-slate-900/90 border border-hud/40">
+                    <h4 class="font-orbitron font-bold text-hud mb-1">PASO 3: Ponerla como página de inicio en Brave</h4>
+                    <p class="text-xs text-slate-300">En Brave abre <code class="text-cyan-300">brave://settings/getStarted</code> (Configuración &rarr; Al iniciar) y pega la URL de tu GitHub Pages (ej. <code class="text-cyan-300">https://tu-usuario.github.io/mi-home/</code>).</p>
+                </div>
+
+                <!-- Bloque de exportación de JSON/JS si el usuario quiere fijar sus links en el código -->
+                <div class="p-3 rounded bg-slate-950 border border-hud/50">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-mono-tech text-xs text-hud">Respaldo de tus enlaces y juegos actuales:</span>
+                        <button onclick="copyConfigToClipboard()" class="hud-btn px-2.5 py-1 text-[11px]">
+                            <i class="fa-solid fa-copy mr-1"></i>Copiar JSON
+                        </button>
+                    </div>
+                    <textarea id="exportCodeBox" readonly rows="3" class="w-full bg-slate-900 text-cyan-300 font-mono-tech text-[11px] p-2 rounded border border-slate-700 focus:outline-none"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         8. LÓGICA JAVASCRIPT (CONFIGURACIÓN, CARRUSEL, ACCESOS Y 2 MINIJUEGOS)
+         ========================================================================= -->
+    <script>
+        /* =====================================================================
+         * SECCIÓN EDITABLE PARA GITHUB: FONDOS Y ENLACES PREDETERMINADOS
+         * Si subes fotos a tu repositorio de GitHub, puedes poner aquí sus rutas
+         * como 'img/fondo1.jpg' o usar el botón "Mis Fondos" directo en la web.
+         * ===================================================================== */
+        const DEFAULT_BACKGROUNDS = [
+            // Puedes cambiar estos links o agregar rutas locales como 'img/mi_foto1.jpg'
+            "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80", // Setup Gamer Cyberpunk
+            "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1920&q=80", // Sci-Fi Tech Core
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80", // Holographic Abstract
+            "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1920&q=80"  // Neon Gaming Arena
+        ];
+
+        const DEFAULT_LINKS = [
+            // REDES & SOCIAL
+            { id: 'soc-ig', name: 'Instagram', subtitle: 'Feed & Reels', url: 'https://www.instagram.com', category: 'social', icon: 'fa-brands fa-instagram', color: '#E1306C' },
+            { id: 'soc-wa', name: 'WhatsApp', subtitle: 'Web Chat', url: 'https://web.whatsapp.com', category: 'social', icon: 'fa-brands fa-whatsapp', color: '#25D366' },
+            { id: 'soc-tk', name: 'TikTok', subtitle: 'Tendencias', url: 'https://www.tiktok.com', category: 'social', icon: 'fa-brands fa-tiktok', color: '#00f2fe' },
+
+            // COMPRAS & MARKET
+            { id: 'shp-ml', name: 'Mercado Libre', subtitle: 'Envíos Full', url: 'https://www.mercadolibre.com', category: 'shopping', icon: 'fa-solid fa-handshake', color: '#FFE600' },
+            { id: 'shp-al', name: 'AliExpress', subtitle: 'Importación', url: 'https://es.aliexpress.com', category: 'shopping', icon: 'fa-solid fa-bag-shopping', color: '#FF4747' },
+            { id: 'shp-fb', name: 'FB Market', subtitle: 'Compra / Venta', url: 'https://www.facebook.com/marketplace', category: 'shopping', icon: 'fa-brands fa-facebook', color: '#1877F2' },
+
+            // INTELIGENCIA ARTIFICIAL
+            { id: 'ai-gem', name: 'Google Gemini', subtitle: 'IA Multimodal', url: 'https://gemini.google.com', category: 'ai', icon: 'fa-solid fa-wand-magic-sparkles', color: '#4facfe' },
+            { id: 'ai-gpt', name: 'ChatGPT', subtitle: 'OpenAI Core', url: 'https://chatgpt.com', category: 'ai', icon: 'fa-solid fa-robot', color: '#10a37f' },
+
+            // ZONA GAMER (Editables desde la misma página con el botón de lápiz)
+            { id: 'gam-dbz', name: 'DBZ: Budokai Tenkaichi 3', subtitle: 'Click en ✏️ para tu link', url: 'https://www.retrogames.cc/search?q=dragon+ball+z', category: 'games', icon: 'fa-solid fa-dragon', color: '#ff9900' },
+            { id: 'gam-cod', name: 'Call of Duty: Zombies', subtitle: 'Click en ✏️ para tu link', url: 'https://nzp.gay/', category: 'games', icon: 'fa-solid fa-skull-crossbones', color: '#ff3333' }
+        ];
+
+        /* =====================================================================
+         * ESTADO GLOBAL Y SONIDOS RETRO HUD (WEB AUDIO API)
+         * ===================================================================== */
+        let appState = {
+            links: [],
+            backgrounds: [],
+            bgIntervalMs: 15000,
+            bgOverlayOpacity: 0.68,
+            currentSlide: 0,
+            isSlidePaused: false,
+            searchEngine: 'brave',
+            themeIndex: 0, // 0: Jarvis Cyan, 1: Iron Man Red/Gold, 2: Gamer Purple
+            soundEnabled: true
+        };
+
+        let slideTimer = null;
+        let audioCtx = null;
+
+        function playHudBeep(freq = 880, duration = 0.05, type = 'sine') {
+            if (!appState.soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function toggleSound() {
+            appState.soundEnabled = !appState.soundEnabled;
+            const btn = document.getElementById('soundBtn');
+            btn.innerHTML = appState.soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark text-slate-400"></i>';
+            if (appState.soundEnabled) playHudBeep(1040, 0.07);
+            saveStateToStorage();
+        }
+
+        /* =====================================================================
+         * INICIALIZACIÓN Y PERSISTENCIA EN LOCALSTORAGE
+         * ===================================================================== */
+        function loadStateFromStorage() {
+            try {
+                const savedLinks = localStorage.getItem('jarvis_hud_links_v1');
+                appState.links = savedLinks ? JSON.parse(savedLinks) : [...DEFAULT_LINKS];
+
+                const savedBgs = localStorage.getItem('jarvis_hud_bgs_v1');
+                appState.backgrounds = savedBgs ? JSON.parse(savedBgs) : [...DEFAULT_BACKGROUNDS];
+                if (appState.backgrounds.length === 0) appState.backgrounds = [...DEFAULT_BACKGROUNDS];
+
+                const savedSettings = localStorage.getItem('jarvis_hud_settings_v1');
+                if (savedSettings) {
+                    const parsed = JSON.parse(savedSettings);
+                    appState.bgIntervalMs = parsed.bgIntervalMs || 15000;
+                    appState.bgOverlayOpacity = parsed.bgOverlayOpacity ?? 0.68;
+                    appState.themeIndex = parsed.themeIndex || 0;
+                    appState.soundEnabled = parsed.soundEnabled ?? true;
+                }
+
+                const savedNotes = localStorage.getItem('jarvis_hud_notes_v1');
+                if (savedNotes) {
+                    document.getElementById('quickNotes').value = savedNotes;
+                }
+            } catch (err) {
+                console.warn('Usando configuración por defecto:', err);
+                appState.links = [...DEFAULT_LINKS];
+                appState.backgrounds = [...DEFAULT_BACKGROUNDS];
+            }
+        }
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem('jarvis_hud_links_v1', JSON.stringify(appState.links));
+                localStorage.setItem('jarvis_hud_bgs_v1', JSON.stringify(appState.backgrounds));
+                localStorage.setItem('jarvis_hud_settings_v1', JSON.stringify({
+                    bgIntervalMs: appState.bgIntervalMs,
+                    bgOverlayOpacity: appState.bgOverlayOpacity,
+                    themeIndex: appState.themeIndex,
+                    soundEnabled: appState.soundEnabled
+                }));
+            } catch (err) {
+                setStatusTicker('Atención: Imagen muy pesada para la memoria local. Usa imágenes más ligeras o rutas de archivo.');
+            }
+        }
+
+        /* =====================================================================
+         * RELOJ DIGITAL J.A.R.V.I.S. Y TELEMETRÍA SIMULADA
+         * ===================================================================== */
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const secs = String(now.getSeconds()).padStart(2, '0');
+
+            document.getElementById('clockTime').textContent = `${hours}:${mins}`;
+            document.getElementById('clockSeconds').textContent = `${secs} SEG`;
+
+            // Saludo inteligente según la hora
+            const hr = now.getHours();
+            let greeting = 'BUENAS NOCHES, SEÑOR';
+            if (hr >= 5 && hr < 12) greeting = 'BUENOS DÍAS, SEÑOR';
+            else if (hr >= 12 && hr < 20) greeting = 'BUENAS TARDES, SEÑOR';
+            document.getElementById('hudGreeting').textContent = greeting;
+
+            const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('clockDate').textContent = now.toLocaleDateString('es-ES', opcionesFecha);
+        }
+
+        function updateTelemetry() {
+            const cpu = Math.floor(Math.random() * 28) + 12;
+            const ram = Math.floor(Math.random() * 20) + 38;
+            const cpuEl = document.getElementById('cpuVal');
+            const ramEl = document.getElementById('ramVal');
+            if (cpuEl && ramEl) {
+                cpuEl.textContent = `${cpu}%`;
+                document.getElementById('cpuBar').style.width = `${cpu}%`;
+                ramEl.textContent = `${ram}%`;
+                document.getElementById('ramBar').style.width = `${ram}%`;
+            }
+        }
+
+        /* =====================================================================
+         * SISTEMA DE FONDOS DE PANTALLA (SLIDESHOW + SUBIDA DESDE PC)
+         * ===================================================================== */
+        function renderBackgroundSlides() {
+            const stage = document.getElementById('bg-stage');
+            stage.innerHTML = '';
+
+            appState.backgrounds.forEach((bgUrl, index) => {
+                const slide = document.createElement('div');
+                slide.className = `bg-slide ${index === appState.currentSlide ? 'active' : ''}`;
+                slide.style.backgroundImage = `url('${bgUrl}')`;
+                stage.appendChild(slide);
+            });
+
+            updateSlideCounterUI();
+            renderBgGalleryModal();
+        }
+
+        function updateSlideCounterUI() {
+            const total = appState.backgrounds.length;
+            const current = (appState.currentSlide % total) + 1;
+            document.getElementById('slideCounter').textContent = `${current}/${total}`;
+            document.getElementById('totalBgCount').textContent = total;
+            document.getElementById('modalBgCount').textContent = total;
+        }
+
+        function showSlide(index) {
+            const slides = document.querySelectorAll('.bg-slide');
+            if (!slides.length) return;
+            slides.forEach(s => s.classList.remove('active'));
+            appState.currentSlide = (index + slides.length) % slides.length;
+            slides[appState.currentSlide].classList.add('active');
+            updateSlideCounterUI();
+        }
+
+        function nextBackground() {
+            playHudBeep(620, 0.04);
+            showSlide(appState.currentSlide + 1);
+            restartSlideTimer();
+        }
+
+        function prevBackground() {
+            playHudBeep(520, 0.04);
+            showSlide(appState.currentSlide - 1);
+            restartSlideTimer();
+        }
+
+        function toggleSlideshowPause() {
+            appState.isSlidePaused = !appState.isSlidePaused;
+            const btn = document.getElementById('pauseSlideBtn');
+            btn.innerHTML = appState.isSlidePaused ? '<i class="fa-solid fa-play text-amber-400"></i>' : '<i class="fa-solid fa-pause"></i>';
+            if (appState.isSlidePaused) {
+                clearInterval(slideTimer);
+                setStatusTicker('Carrusel de fondos en pausa.');
+            } else {
+                restartSlideTimer();
+                setStatusTicker('Carrusel de fondos reanudado.');
+            }
+        }
+
+        function restartSlideTimer() {
+            if (slideTimer) clearInterval(slideTimer);
+            if (!appState.isSlidePaused && appState.backgrounds.length > 1) {
+                slideTimer = setInterval(() => {
+                    showSlide(appState.currentSlide + 1);
+                }, appState.bgIntervalMs);
+            }
+        }
+
+        // Subir imágenes desde el PC y comprimirlas en Canvas para que quepan varias en localStorage
+        function handleLocalImageUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const maxW = 1600;
+                        const maxH = 900;
+                        let w = img.width;
+                        let h = img.height;
+
+                        if (w > maxW || h > maxH) {
+                            const ratio = Math.min(maxW / w, maxH / h);
+                            w = Math.round(w * ratio);
+                            h = Math.round(h * ratio);
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+
+                        // Guardar en JPEG optimizado para no saturar memoria del navegador
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                        appState.backgrounds.push(dataUrl);
+                        appState.currentSlide = appState.backgrounds.length - 1;
+                        saveStateToStorage();
+                        renderBackgroundSlides();
+                        restartSlideTimer();
+                        playHudBeep(1100, 0.08);
+                        setStatusTicker(`Imagen "${file.name}" agregada al carrusel de fondos.`);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            event.target.value = '';
+        }
+
+        function addBackgroundByUrl() {
+            const input = document.getElementById('bgUrlInput');
+            const val = input.value.trim();
+            if (!val) return;
+            appState.backgrounds.push(val);
+            appState.currentSlide = appState.backgrounds.length - 1;
+            input.value = '';
+            saveStateToStorage();
+            renderBackgroundSlides();
+            restartSlideTimer();
+            playHudBeep(1020, 0.07);
+            setStatusTicker('Nuevo fondo agregado a la lista.');
+        }
+
+        function removeBackgroundAt(index) {
+            if (appState.backgrounds.length <= 1) {
+                setStatusTicker('Debes mantener al menos 1 imagen de fondo activa.');
+                return;
+            }
+            appState.backgrounds.splice(index, 1);
+            if (appState.currentSlide >= appState.backgrounds.length) {
+                appState.currentSlide = 0;
+            }
+            saveStateToStorage();
+            renderBackgroundSlides();
+            restartSlideTimer();
+        }
+
+        function resetDefaultBackgrounds() {
+            appState.backgrounds = [...DEFAULT_BACKGROUNDS];
+            appState.currentSlide = 0;
+            saveStateToStorage();
+            renderBackgroundSlides();
+            restartSlideTimer();
+            setStatusTicker('Fondos predeterminados restaurados.');
+        }
+
+        function renderBgGalleryModal() {
+            const list = document.getElementById('bgGalleryList');
+            list.innerHTML = '';
+            appState.backgrounds.forEach((bg, idx) => {
+                const isLocalData = bg.startsWith('data:image');
+                const label = isLocalData ? `Foto PC #${idx + 1}` : bg.split('/').pop().slice(0, 18);
+
+                const item = document.createElement('div');
+                item.className = `relative group rounded-lg overflow-hidden border ${idx === appState.currentSlide ? 'border-cyan-400 ring-2 ring-cyan-400/50' : 'border-slate-700'} bg-slate-950 h-24`;
+                item.innerHTML = `
+                    <div class="w-full h-full bg-cover bg-center cursor-pointer" style="background-image: url('${bg}')" onclick="showSlide(${idx})"></div>
+                    <div class="absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1 flex items-center justify-between text-[10px] font-mono-tech">
+                        <span class="truncate text-slate-200">${label}</span>
+                        <button onclick="removeBackgroundAt(${idx})" class="text-red-400 hover:text-red-300 ml-1" title="Eliminar este fondo">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function updateBgSettings() {
+            const select = document.getElementById('bgIntervalSelect');
+            appState.bgIntervalMs = parseInt(select.value, 10);
+            saveStateToStorage();
+            restartSlideTimer();
+        }
+
+        function updateBgOverlayOpacity(val) {
+            appState.bgOverlayOpacity = parseFloat(val);
+            document.documentElement.style.setProperty('--bg-overlay-opacity', appState.bgOverlayOpacity);
+            saveStateToStorage();
+        }
+
+        /* =====================================================================
+         * RENDERIZADO Y GESTIÓN DE ACCESOS DIRECTOS Y ZONA GAMER
+         * ===================================================================== */
+        function renderAllLinks() {
+            const containers = {
+                social: document.getElementById('grid-social'),
+                shopping: document.getElementById('grid-shopping'),
+                ai: document.getElementById('grid-ai'),
+                games: document.getElementById('grid-games')
+            };
+
+            Object.values(containers).forEach(c => { if (c) c.innerHTML = ''; });
+
+            appState.links.forEach(item => {
+                const targetGrid = containers[item.category] || containers.games;
+                const card = document.createElement('div');
+                card.className = 'hud-card group flex flex-col justify-between p-2.5';
+
+                if (item.category === 'games') {
+                    // Diseño horizontal detallado para Zona Gamer con botón directo para editar el link
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between gap-2">
+                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" onclick="playHudBeep(920, 0.05)" class="flex items-center gap-2.5 flex-grow min-w-0">
+                                <div class="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-900/90 border border-cyan-500/30 shrink-0">
+                                    <i class="${item.icon} text-lg" style="color: ${item.color || 'var(--hud-primary)'}"></i>
+                                </div>
+                                <div class="truncate">
+                                    <div class="font-orbitron font-bold text-xs text-white group-hover:text-cyan-300 truncate">${item.name}</div>
+                                    <div class="text-[11px] text-slate-400 font-mono-tech truncate">${item.subtitle || 'Jugar ahora'}</div>
+                                </div>
+                            </a>
+                            <button onclick="openLinkModal('${item.category}', '${item.id}')" title="Cambiar link o editar" class="opacity-75 hover:opacity-100 px-2 py-1 rounded bg-slate-900/90 hover:bg-cyan-500/20 text-cyan-300 text-xs shrink-0">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // Diseño compacto para Redes, Compras e IA
+                    card.innerHTML = `
+                        <button onclick="openLinkModal('${item.category}', '${item.id}')" title="Editar acceso" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-slate-400 hover:text-cyan-300 px-1">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" onclick="playHudBeep(920, 0.05)" class="flex flex-col items-center text-center py-1">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-slate-900/90 border border-cyan-500/25 mb-1.5 shadow-inner">
+                                <i class="${item.icon} text-xl" style="color: ${item.color || 'var(--hud-primary)'}"></i>
+                            </div>
+                            <span class="font-orbitron font-bold text-xs text-white group-hover:text-cyan-300 truncate w-full">${item.name}</span>
+                            <span class="text-[10px] font-mono-tech text-slate-400 truncate w-full">${item.subtitle || ''}</span>
+                        </a>
+                    `;
+                }
+                targetGrid.appendChild(card);
+            });
+        }
+
+        function openLinkModal(defaultCategory = 'games', linkId = null) {
+            playHudBeep(780, 0.05);
+            const modal = document.getElementById('linkModal');
+            const deleteBtn = document.getElementById('deleteLinkBtn');
+
+            if (linkId) {
+                const existing = appState.links.find(l => l.id === linkId);
+                if (existing) {
+                    document.getElementById('linkModalTitle').textContent = 'EDITAR ENLACE // HUD';
+                    document.getElementById('editLinkId').value = existing.id;
+                    document.getElementById('linkName').value = existing.name;
+                    document.getElementById('linkUrl').value = existing.url;
+                    document.getElementById('linkCategory').value = existing.category;
+                    document.getElementById('linkIcon').value = existing.icon || 'fa-solid fa-gamepad';
+                    document.getElementById('linkSubtitle').value = existing.subtitle || '';
+                    deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('linkModalTitle').textContent = 'AGREGAR NUEVO JUEGO / LINK';
+                document.getElementById('editLinkId').value = '';
+                document.getElementById('linkName').value = '';
+                document.getElementById('linkUrl').value = '';
+                document.getElementById('linkCategory').value = defaultCategory;
+                document.getElementById('linkIcon').value = 'fa-solid fa-gamepad';
+                document.getElementById('linkSubtitle').value = '';
+                deleteBtn.classList.add('hidden');
+            }
+
+            openModal('linkModal');
+        }
+
+        function saveCustomLink(event) {
+            event.preventDefault();
+            const id = document.getElementById('editLinkId').value;
+            const name = document.getElementById('linkName').value.trim();
+            let url = document.getElementById('linkUrl').value.trim();
+            const category = document.getElementById('linkCategory').value;
+            const icon = document.getElementById('linkIcon').value;
+            const subtitle = document.getElementById('linkSubtitle').value.trim();
+
+            if (!/^https?:\/\//i.test(url)) {
+                url = 'https://' + url;
+            }
+
+            if (id) {
+                const idx = appState.links.findIndex(l => l.id === id);
+                if (idx > -1) {
+                    appState.links[idx] = { ...appState.links[idx], name, url, category, icon, subtitle };
+                }
+            } else {
+                appState.links.push({
+                    id: 'custom-' + Date.now(),
+                    name,
+                    url,
+                    category,
+                    icon,
+                    subtitle: subtitle || 'Acceso directo',
+                    color: '#00f3ff'
+                });
+            }
+
+            saveStateToStorage();
+            renderAllLinks();
+            closeModal('linkModal');
+            playHudBeep(1180, 0.08);
+            setStatusTicker(`Acceso "${name}" actualizado en tu panel J.A.R.V.I.S.`);
+        }
+
+        function deleteCurrentLink() {
+            const id = document.getElementById('editLinkId').value;
+            if (!id) return;
+            appState.links = appState.links.filter(l => l.id !== id);
+            saveStateToStorage();
+            renderAllLinks();
+            closeModal('linkModal');
+            setStatusTicker('Acceso eliminado correctamente.');
+        }
+
+        /* =====================================================================
+         * BARRA DE BÚSQUEDA (BRAVE, GOOGLE, YOUTUBE) Y TEMAS DE COLOR
+         * ===================================================================== */
+        function setSearchEngine(engine) {
+            appState.searchEngine = engine;
+            playHudBeep(840, 0.04);
+            document.querySelectorAll('.engine-btn').forEach(btn => btn.classList.remove('hud-btn-active'));
+            document.getElementById(`eng-${engine}`).classList.add('hud-btn-active');
+
+            const placeholders = {
+                brave: 'Ejecutar búsqueda privada en Brave Search...',
+                google: 'Ejecutar búsqueda global en Google...',
+                youtube: 'Buscar videos, música o gameplays en YouTube...'
+            };
+            document.getElementById('searchInput').placeholder = placeholders[engine];
+        }
+
+        function handleSearch(event) {
+            event.preventDefault();
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+            playHudBeep(1200, 0.08);
+
+            const urls = {
+                brave: `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
+                google: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+                youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
+            };
+            window.location.href = urls[appState.searchEngine];
+        }
+
+        function cycleTheme() {
+            appState.themeIndex = (appState.themeIndex + 1) % 3;
+            applyTheme();
+            saveStateToStorage();
+            playHudBeep(960, 0.06);
+        }
+
+        function applyTheme() {
+            document.body.classList.remove('theme-ironman', 'theme-gamer');
+            const label = document.getElementById('themeLabel');
+            if (appState.themeIndex === 1) {
+                document.body.classList.add('theme-ironman');
+                if (label) label.textContent = 'Mark LXXXV';
+            } else if (appState.themeIndex === 2) {
+                document.body.classList.add('theme-gamer');
+                if (label) label.textContent = 'Neón Gamer';
+            } else {
+                if (label) label.textContent = 'Cian Jarvis';
+            }
+        }
+
+        /* =====================================================================
+         * CONSOLA DE MINIJUEGOS INTEGRADA:
+         * 1) CYBER-SNAKE J.A.R.V.I.S.
+         * 2) DINO CYBER-RUNNER (ESTILO CHROME DINO)
+         * ===================================================================== */
+        const canvas = document.getElementById('arcadeCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentArcadeMode = 'snake'; // 'snake' o 'dino'
+        let arcadeRunning = false;
+        let arcadeLoopId = null;
+        let arcadeScore = 0;
+
+        // Estado para Cyber-Snake
+        let snake = [];
+        let snakeDir = { x: 1, y: 0 };
+        let nextSnakeDir = { x: 1, y: 0 };
+        let snakeFood = { x: 10, y: 5 };
+        let lastSnakeStep = 0;
+
+        // Estado para Cyber-Runner (Dino Chrome Style)
+        let dino = { x: 45, y: 170, w: 26, h: 32, vy: 0, jumping: false, ducking: false };
+        let dinoObstacles = [];
+        let dinoSpeed = 4.5;
+        let dinoSpawnTimer = 0;
+        const GROUND_Y = 202;
+
+        function getHighScore(mode) {
+            return parseInt(localStorage.getItem(`jarvis_high_${mode}`) || '0', 10);
+        }
+
+        function setHighScore(mode, score) {
+            const prev = getHighScore(mode);
+            if (score > prev) {
+                localStorage.setItem(`jarvis_high_${mode}`, String(score));
+            }
+            document.getElementById('arcadeHighScore').textContent = Math.max(prev, score);
+        }
+
+        function switchArcadeGame(mode) {
+            playHudBeep(750, 0.05);
+            stopArcadeGame();
+            currentArcadeMode = mode;
+
+            document.getElementById('tab-snake').classList.toggle('hud-btn-active', mode === 'snake');
+            document.getElementById('tab-dino').classList.toggle('hud-btn-active', mode === 'dino');
+
+            const titleEl = document.getElementById('arcadeGameTitle');
+            const ovTitle = document.getElementById('overlayTitle');
+            const ovDesc = document.getElementById('overlayDesc');
+            const ovIcon = document.getElementById('overlayIcon');
+
+            if (mode === 'snake') {
+                titleEl.textContent = 'CYBER-SNAKE';
+                ovTitle.textContent = 'CYBER-SNAKE J.A.R.V.I.S.';
+                ovDesc.innerHTML = 'Usa las flechas o <kbd class="px-1 bg-slate-800 rounded text-cyan-300">W A S D</kbd> para absorber núcleos de energía sin chocar.';
+                ovIcon.className = 'fa-solid fa-staff-snake text-3xl text-hud mb-2';
+            } else {
+                titleEl.textContent = 'DINO-RUNNER';
+                ovTitle.textContent = 'DINO CYBER-RUNNER';
+                ovDesc.innerHTML = 'Estilo Dinosaurio de Chrome: Presiona <kbd class="px-1 bg-slate-800 rounded text-cyan-300">ESPACIO</kbd> o <kbd class="px-1 bg-slate-800 rounded text-cyan-300">W / ↑</kbd> para saltar drones y barreras láser.';
+                ovIcon.className = 'fa-solid fa-bolt text-3xl text-hud mb-2';
+            }
+
+            document.getElementById('arcadeScore').textContent = '0';
+            document.getElementById('arcadeHighScore').textContent = getHighScore(mode);
+            document.getElementById('arcadeOverlay').classList.remove('hidden');
+            drawArcadeIdleScreen();
+        }
+
+        function startArcadeGame() {
+            playHudBeep(1050, 0.08);
+            document.getElementById('arcadeOverlay').classList.add('hidden');
+            arcadeScore = 0;
+            document.getElementById('arcadeScore').textContent = '0';
+            document.getElementById('arcadeHighScore').textContent = getHighScore(currentArcadeMode);
+            arcadeRunning = true;
+
+            if (currentArcadeMode === 'snake') {
+                initSnakeGame();
+            } else {
+                initDinoGame();
+            }
+
+            if (arcadeLoopId) cancelAnimationFrame(arcadeLoopId);
+            arcadeLoopId = requestAnimationFrame(arcadeMainLoop);
+        }
+
+        function stopArcadeGame(isGameOver = false) {
+            arcadeRunning = false;
+            if (arcadeLoopId) cancelAnimationFrame(arcadeLoopId);
+            if (isGameOver) {
+                playHudBeep(240, 0.2, 'sawtooth');
+                setHighScore(currentArcadeMode, arcadeScore);
+                const overlay = document.getElementById('arcadeOverlay');
+                document.getElementById('overlayTitle').textContent = `¡PARTIDA TERMINADA! (${arcadeScore} PTS)`;
+                overlay.classList.remove('hidden');
+            }
+        }
+
+        // --- LÓGICA JUEGO 1: CYBER-SNAKE ---
+        const GRID_SIZE = 15;
+        function initSnakeGame() {
+            snake = [
+                { x: 6, y: 7 },
+                { x: 5, y: 7 },
+                { x: 4, y: 7 }
+            ];
+            snakeDir = { x: 1, y: 0 };
+            nextSnakeDir = { x: 1, y: 0 };
+            spawnSnakeFood();
+            lastSnakeStep = performance.now();
+        }
+
+        function spawnSnakeFood() {
+            const cols = Math.floor(canvas.width / GRID_SIZE);
+            const rows = Math.floor(canvas.height / GRID_SIZE);
+            snakeFood = {
+                x: Math.floor(Math.random() * (cols - 2)) + 1,
+                y: Math.floor(Math.random() * (rows - 2)) + 1
+            };
+        }
+
+        function updateSnake(timestamp) {
+            const speedMs = Math.max(65, 115 - Math.floor(arcadeScore / 30) * 5);
+            if (timestamp - lastSnakeStep < speedMs) return;
+            lastSnakeStep = timestamp;
+
+            snakeDir = { ...nextSnakeDir };
+            const head = { x: snake[0].x + snakeDir.x, y: snake[0].y + snakeDir.y };
+
+            const cols = Math.floor(canvas.width / GRID_SIZE);
+            const rows = Math.floor(canvas.height / GRID_SIZE);
+
+            // Colisión con bordes o propio cuerpo
+            if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows || snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+                stopArcadeGame(true);
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === snakeFood.x && head.y === snakeFood.y) {
+                arcadeScore += 10;
+                document.getElementById('arcadeScore').textContent = arcadeScore;
+                setHighScore('snake', arcadeScore);
+                playHudBeep(1320, 0.05);
+                spawnSnakeFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function drawSnake() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Cuadrícula tenue
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += GRID_SIZE) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += GRID_SIZE) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Dibujar núcleo de energía (Comida)
+            ctx.save();
+            ctx.fillStyle = '#ff9900';
+            ctx.shadowColor = '#ff9900';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(
+                snakeFood.x * GRID_SIZE + GRID_SIZE / 2,
+                snakeFood.y * GRID_SIZE + GRID_SIZE / 2,
+                GRID_SIZE / 2 - 1,
+                0, Math.PI * 2
+            );
+            ctx.fill();
+            ctx.restore();
+
+            // Dibujar serpiente holográfica
+            snake.forEach((seg, index) => {
+                ctx.save();
+                ctx.fillStyle = index === 0 ? '#ffffff' : '#00f3ff';
+                ctx.shadowColor = '#00f3ff';
+                ctx.shadowBlur = index === 0 ? 12 : 4;
+                ctx.fillRect(seg.x * GRID_SIZE + 1, seg.y * GRID_SIZE + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+                ctx.restore();
+            });
+        }
+
+        // --- LÓGICA JUEGO 2: DINO CYBER-RUNNER (ESTILO CHROME DINO) ---
+        function initDinoGame() {
+            dino = { x: 45, y: GROUND_Y - 32, w: 26, h: 32, vy: 0, jumping: false, ducking: false };
+            dinoObstacles = [];
+            dinoSpeed = 4.5;
+            dinoSpawnTimer = 0;
+        }
+
+        function updateDino() {
+            // Gravedad del jugador
+            if (dino.jumping) {
+                dino.y += dino.vy;
+                dino.vy += 0.68;
+                const currentHeight = dino.ducking ? 20 : 32;
+                if (dino.y >= GROUND_Y - currentHeight) {
+                    dino.y = GROUND_Y - currentHeight;
+                    dino.vy = 0;
+                    dino.jumping = false;
+                }
+            } else {
+                dino.h = dino.ducking ? 20 : 32;
+                dino.y = GROUND_Y - dino.h;
+            }
+
+            // Generar obstáculos (Barreras láser en suelo o Drones aéreos)
+            dinoSpawnTimer--;
+            if (dinoSpawnTimer <= 0) {
+                const isDrone = Math.random() > 0.68 && arcadeScore > 80;
+                dinoObstacles.push({
+                    x: canvas.width + 20,
+                    y: isDrone ? GROUND_Y - 48 : GROUND_Y - (Math.random() > 0.5 ? 30 : 22),
+                    w: isDrone ? 26 : 16,
+                    h: isDrone ? 16 : (Math.random() > 0.5 ? 30 : 22),
+                    type: isDrone ? 'drone' : 'laser'
+                });
+                dinoSpawnTimer = Math.floor(Math.random() * 45) + 45;
+            }
+
+            // Mover obstáculos y detectar colisiones
+            for (let i = dinoObstacles.length - 1; i >= 0; i--) {
+                const obs = dinoObstacles[i];
+                obs.x -= dinoSpeed;
+
+                // Colisión AABB con margen justo
+                if (
+                    dino.x + 4 < obs.x + obs.w &&
+                    dino.x + dino.w - 4 > obs.x &&
+                    dino.y + 4 < obs.y + obs.h &&
+                    dino.y + dino.h - 2 > obs.y
+                ) {
+                    stopArcadeGame(true);
+                    return;
+                }
+
+                if (obs.x + obs.w < 0) {
+                    dinoObstacles.splice(i, 1);
+                    arcadeScore += 10;
+                    document.getElementById('arcadeScore').textContent = arcadeScore;
+                    setHighScore('dino', arcadeScore);
+                    dinoSpeed = Math.min(9.5, 4.5 + arcadeScore * 0.008);
+                }
+            }
+        }
+
+        function drawDino() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Línea de horizonte cibernético
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, GROUND_Y);
+            ctx.lineTo(canvas.width, GROUND_Y);
+            ctx.stroke();
+
+            // Dibujar avatar Cyber-Dino / Mecha Runner
+            ctx.save();
+            ctx.fillStyle = '#00f3ff';
+            ctx.shadowColor = '#00f3ff';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+            // Visor estilo Iron Man en el personaje
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(dino.x + dino.w - 9, dino.y + 5, 7, 4);
+            ctx.restore();
+
+            // Dibujar obstáculos
+            dinoObstacles.forEach(obs => {
+                ctx.save();
+                ctx.fillStyle = obs.type === 'drone' ? '#ff9900' : '#ff2a55';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 10;
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                ctx.restore();
+            });
+        }
+
+        function arcadeMainLoop(timestamp) {
+            if (!arcadeRunning) return;
+            if (currentArcadeMode === 'snake') {
+                updateSnake(timestamp);
+                if (arcadeRunning) drawSnake();
+            } else {
+                updateDino();
+                if (arcadeRunning) drawDino();
+            }
+            if (arcadeRunning) {
+                arcadeLoopId = requestAnimationFrame(arcadeMainLoop);
+            }
+        }
+
+        function drawArcadeIdleScreen() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+            for (let x = 0; x < canvas.width; x += 20) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 20) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+        }
+
+        // Controles unificados (Teclado y Botones en Pantalla)
+        function arcadeControlInput(dir) {
+            if (!arcadeRunning) {
+                startArcadeGame();
+                return;
+            }
+            if (currentArcadeMode === 'snake') {
+                if (dir === 'UP' && snakeDir.y === 0) nextSnakeDir = { x: 0, y: -1 };
+                if (dir === 'DOWN' && snakeDir.y === 0) nextSnakeDir = { x: 0, y: 1 };
+                if (dir === 'LEFT' && snakeDir.x === 0) nextSnakeDir = { x: -1, y: 0 };
+                if (dir === 'RIGHT' && snakeDir.x === 0) nextSnakeDir = { x: 1, y: 0 };
+            } else {
+                if ((dir === 'UP' || dir === 'SPACE') && !dino.jumping) {
+                    dino.vy = -11.2;
+                    dino.jumping = true;
+                    dino.ducking = false;
+                    playHudBeep(660, 0.05);
+                } else if (dir === 'DOWN') {
+                    dino.ducking = true;
+                    setTimeout(() => { dino.ducking = false; }, 380);
+                }
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            // No interceptar teclas si el usuario está escribiendo en el buscador, notas o modales
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                if (arcadeRunning) e.preventDefault();
+            }
+
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') arcadeControlInput('UP');
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') arcadeControlInput('DOWN');
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') arcadeControlInput('LEFT');
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') arcadeControlInput('RIGHT');
+            if (e.code === 'Space') arcadeControlInput('SPACE');
+        });
+
+        /* =====================================================================
+         * MODALES, NOTAS Y EXPORTACIÓN PARA GITHUB
+         * ===================================================================== */
+        function openModal(id) {
+            playHudBeep(880, 0.05);
+            const m = document.getElementById(id);
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            if (id === 'githubModal') {
+                document.getElementById('exportCodeBox').value = JSON.stringify(appState.links, null, 2);
+            }
+        }
+
+        function closeModal(id) {
+            playHudBeep(540, 0.04);
+            const m = document.getElementById(id);
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function exportConfigForGitHub() {
+            openModal('githubModal');
+        }
+
+        function copyConfigToClipboard() {
+            const box = document.getElementById('exportCodeBox');
+            box.select();
+            document.execCommand('copy');
+            playHudBeep(1250, 0.07);
+            setStatusTicker('Configuración JSON copiada al portapapeles.');
+        }
+
+        function setStatusTicker(msg) {
+            const ticker = document.getElementById('statusTicker');
+            if (ticker) ticker.textContent = msg;
+        }
+
+        // Guardado automático de Notas Rápidas
+        document.getElementById('quickNotes').addEventListener('input', (e) => {
+            localStorage.setItem('jarvis_hud_notes_v1', e.target.value);
+            const badge = document.getElementById('noteSavedBadge');
+            badge.style.opacity = '1';
+            setTimeout(() => { badge.style.opacity = '0'; }, 1200);
+        });
+
+        /* =====================================================================
+         * ARRANQUE DEL SISTEMA AL CARGAR LA PÁGINA
+         * ===================================================================== */
+        window.onload = function() {
+            loadStateFromStorage();
+            applyTheme();
+            document.documentElement.style.setProperty('--bg-overlay-opacity', appState.bgOverlayOpacity);
+            document.getElementById('bgOpacityRange').value = appState.bgOverlayOpacity;
+            document.getElementById('bgIntervalSelect').value = String(appState.bgIntervalMs);
+
+            updateClock();
+            setInterval(updateClock, 1000);
+            setInterval(updateTelemetry, 3500);
+
+            renderBackgroundSlides();
+            restartSlideTimer();
+            renderAllLinks();
+
+            document.getElementById('arcadeHighScore').textContent = getHighScore('snake');
+            drawArcadeIdleScreen();
+        };
+    </script>
+</body>
+</html>
